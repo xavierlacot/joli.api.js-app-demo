@@ -1,36 +1,3 @@
-joli.hideIndicator = function() {
-  if ((Titanium.Platform.name != 'android') && Titanium.UI.currentWindow) {
-  	Titanium.UI.currentWindow.setToolbar(null,{animated:true});
-  }
-};
-
-joli.showIndicator = function() {
-  if ((Titanium.Platform.name != 'android') && Titanium.UI.currentWindow) {
-    var toolActInd = Titanium.UI.createActivityIndicator();
-  	toolActInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.PLAIN;
-  	toolActInd.font = {fontFamily:'Helvetica Neue', fontSize:15,fontWeight:'bold'};
-  	toolActInd.color = 'white';
-  	toolActInd.message = 'Chargement...';
-  	Titanium.UI.currentWindow.setToolbar([toolActInd],{animated:true});
-  	toolActInd.show();
-  }
-
-  if ((Titanium.Platform.name == 'android') && Titanium.UI.currentWindow) {
-    var toolActInd = Titanium.UI.createActivityIndicator({
-    	bottom:10,
-    	height:50,
-    	width:10
-    });
-    Titanium.UI.currentWindow.add(toolActInd);
-  	toolActInd.show();
-  	toolActInd.message = 'Loading...';
-
-  	setTimeout(function() {
-  		toolActInd.hide();
-  	}, 1000);
-  }
-};
-
 joli.saveRecord = function(table, items) {
   var i = 0;
   var new_count = 0;
@@ -38,6 +5,7 @@ joli.saveRecord = function(table, items) {
   table = joli.models.get(table);
 
   while (i < items.length) {
+    // @TODO : update an existing record, too
     if (!table.exists(items[i].id)) {
       table.newRecord(items[i]).save();
       new_count++;
@@ -118,29 +86,41 @@ joli.apimodel.prototype = {
   },
 
   findBy: function(field, value) {
-    var query_string = null;
+    var result = this.parent.findBy(field, value);
 
-    if (field && value) {
-      var where = {};
-      where[field] = value;
-      query_string = this.getQueryString({where: where});
+    if (!result) {
+      var query_string = null;
+
+      if (field && value) {
+        var where = {};
+        where[field] = value;
+        query_string = this.getQueryString({where: where});
+      }
+
+      this.conditionnalUpdate(query_string);
+      return this.parent.findBy(field, value);
     }
 
-    this.conditionnalUpdate(query_string);
-    return this.parent.findBy(field, value);
+    return result;
   },
 
   findOneBy: function(field, value) {
-    var query_string = null;
+    var result = this.parent.findOneBy(field, value);
 
-    if (field && value) {
-      var where = {};
-      where[field] = value;
-      query_string = this.getQueryString({where: where});
+    if (!result) {
+      var query_string = null;
+
+      if (field && value) {
+        var where = {};
+        where[field] = value;
+        query_string = this.getQueryString({where: where});
+      }
+
+      this.conditionnalUpdate(query_string);
+      result = this.parent.findOneBy(field, value);
     }
 
-    this.conditionnalUpdate(query_string);
-    return this.parent.findOneBy(field, value);
+    return result;
   },
 
   forceReload: function(query_string) {
@@ -227,7 +207,6 @@ joli.apimodel.api = function(options) {
 joli.apimodel.api.prototype = {
   call: function(method, params) {
     try {
-      joli.showIndicator();
       this.xhrCallCompleted = false;
       this.xhr = Titanium.Network.createHTTPClient();
       this.xhr.apimodel = this.model.table;
@@ -236,7 +215,6 @@ joli.apimodel.api.prototype = {
 
       this.xhr.onload = function() {
         joli.saveRecord(this.apimodel, this.responseText);
-        joli.hideIndicator();
         return true;
       };
 

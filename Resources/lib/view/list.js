@@ -42,28 +42,143 @@
     }
   });
 
-  // display "refresh" button on the top right of the screen
-  // @TODO: improve it, use a pull to refresh
-  // see http://developer.appcelerator.com/blog/2010/05/how-to-create-a-tweetie-like-pull-to-refresh-table.html
-  var refresh = Titanium.UI.createButton({
-  	systemButton:Titanium.UI.iPhone.SystemButton.REFRESH
-  });
-  refresh.addEventListener('click', function() {
-    // empty table
-    models.people.truncate();
+  // Pull to refresh. Almost all of this code taken from KitchenSink
+  function formatDate() {
+  	var date = new Date();
+  	var datestr = date.getMonth() + '/' + date.getDate() + '/' + date.getFullYear();
 
-    // load the people from the service
+  	if (date.getHours() >= 12) {
+  		datestr += ' ' + (date.getHours() == 12 ? date.getHours() : date.getHours()-12) + ':' + date.getMinutes() + ' PM';
+  	} else {
+  		datestr += ' '+date.getHours() + ':' + date.getMinutes() + ' AM';
+  	}
+
+  	return datestr;
+  }
+
+  var border = Ti.UI.createView({
+  	backgroundColor:"#576c89",
+  	height:2,
+  	bottom:0
+  });
+  var tableHeader = Ti.UI.createView({
+  	backgroundColor:"#e2e7ed",
+  	width:320,
+  	height:60
+  });
+  tableHeader.add(border);
+
+  var arrow = Ti.UI.createView({
+  	backgroundImage:"/images/whiteArrow.png",
+  	width:23,
+  	height:60,
+  	bottom:10,
+  	left:20
+  });
+  var statusLabel = Ti.UI.createLabel({
+  	text:"Pull to reload",
+  	left:55,
+  	width:200,
+  	bottom:30,
+  	height:"auto",
+  	color:"#576c89",
+  	textAlign:"center",
+  	font:{fontSize:13,fontWeight:"bold"},
+  	shadowColor:"#999",
+  	shadowOffset:{x:0,y:1}
+  });
+  var lastUpdatedLabel = Ti.UI.createLabel({
+  	text:"Last Updated: "+formatDate(),
+  	left:55,
+  	width:200,
+  	bottom:15,
+  	height:"auto",
+  	color:"#576c89",
+  	textAlign:"center",
+  	font:{fontSize:12},
+  	shadowColor:"#999",
+  	shadowOffset:{x:0,y:1}
+  });
+  var actInd = Titanium.UI.createActivityIndicator({
+  	left:20,
+  	bottom:13,
+  	width:30,
+  	height:30
+  });
+
+  tableHeader.add(arrow);
+  tableHeader.add(statusLabel);
+  tableHeader.add(lastUpdatedLabel);
+  tableHeader.add(actInd);
+  tableview.headerPullView = tableHeader;
+
+  var pulling = false;
+  var reloading = false;
+
+  function beginReloading() {
+  	// just mock out the reload
+  	setTimeout(endReloading,2000);
+  }
+
+  function endReloading() {
+    // update the table content
     models.people.forceReload();
+
+  	// when you're done, just reset
+  	tableview.setContentInsets({top:0},{animated:true});
+  	reloading = false;
+  	lastUpdatedLabel.text = "Last Updated: "+formatDate();
+  	statusLabel.text = "Pull down to refresh...";
+  	actInd.hide();
+  	arrow.show();
+  }
+
+  tableview.addEventListener('scroll', function(e) {
+  	var offset = e.contentOffset.y;
+  	if (offset <= -65.0 && !pulling) {
+  		var t = Ti.UI.create2DMatrix();
+  		t = t.rotate(-180);
+  		pulling = true;
+  		arrow.animate({transform:t,duration:180});
+  		statusLabel.text = "Release to refresh...";
+  	} else if (pulling && offset > -65.0 && offset < 0) {
+  		pulling = false;
+  		var t = Ti.UI.create2DMatrix();
+  		arrow.animate({transform:t,duration:180});
+  		statusLabel.text = "Pull down to refresh...";
+  	}
+  });
+
+  tableview.addEventListener('scrollEnd', function(e) {
+  	if (pulling && !reloading && e.contentOffset.y <= -65.0) {
+  		reloading = true;
+  		pulling = false;
+  		arrow.hide();
+  		actInd.show();
+  		statusLabel.text = "Reloading...";
+  		tableview.setContentInsets({top:60},{animated:true});
+  		arrow.transform=Ti.UI.create2DMatrix();
+  		beginReloading();
+  	}
+  });
+
+
+  // display a button for adding a new people
+  var addPeople = Titanium.UI.createButton({
+  	systemButton:Titanium.UI.iPhone.SystemButton.ADD
+  });
+  addPeople.addEventListener('click', function() {
+    // send to add.js
   });
 
   if (Ti.Platform.name == 'iPhone OS') {
-  	win.rightNavButton = refresh;
+  	win.rightNavButton = addPeople;
   } else {
-  	refresh.top = 5;
-  	refresh.title = "Refresh";
-  	refresh.width = 200;
+  	addPeople.top = 5;
+  	addPeople.title = "Refresh";
+  	addPeople.width = 200;
   	tableview.top = 60;
-  	win.add(refresh);
+  	win.add(addPeople);
   }
 
   // add the tableview to the window
