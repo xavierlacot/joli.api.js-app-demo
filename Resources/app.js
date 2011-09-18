@@ -1,7 +1,7 @@
 (function(){
   // load joli library and models definition file
   Ti.include('/lib/vendor/joli.js/joli.js');
-  Ti.include('/lib/joli.api.js');
+  Ti.include('/lib/vendor/joli.api.js/joli.api.js');
   Ti.include('/lib/model/models.js');
   joli.models.initialize();
 

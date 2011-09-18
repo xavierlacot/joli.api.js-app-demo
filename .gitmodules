@@ -1,0 +1,6 @@
+[submodule "Resources/lib/vendor/joli.api.js"]
+	path = Resources/lib/vendor/joli.api.js
+	url = https://xavierlacot@github.com/xavierlacot/joli.api.js.git
+[submodule "Resources/lib/vendor/joli.js"]
+	path = Resources/lib/vendor/joli.js
+	url = https://xavierlacot@github.com/xavierlacot/joli.js.git
