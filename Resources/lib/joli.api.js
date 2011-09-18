@@ -1,23 +1,29 @@
 joli.saveRecord = function(table, items) {
   var i = 0;
   var new_count = 0;
+  var updated_count = 0;
   items = joli.jsonParse(items);
   table = joli.models.get(table);
 
   while (i < items.length) {
-    // @TODO : update an existing record, too
     if (!table.exists(items[i].id)) {
       table.newRecord(items[i]).save();
       new_count++;
+    } else {
+      // update the record
+      var record = table.findOneById(items[i].id);
+      record.fromArray(items[i]).save();
+      updated_count++;
     }
 
     i++;
   }
 
-  if (new_count > 0) {
+  if (new_count > 0 || updated_count > 0) {
     Ti.App.fireEvent('joli.records.saved', {
       table: table.table,
-      nb_new: new_count
+      nb_new: new_count,
+      nb_updated: updated_count
     });
   }
 };
@@ -31,6 +37,9 @@ joli.apimodel = function(options) {
   joli.extend.call(this, joli.model, options);
   joli.setOptions.call(this, options, defaults);
   this._api = new joli.apimodel.api({model: this});
+
+  // override the extended model class
+  joli.models.set(this.table, this);
 };
 
 joli.apimodel.prototype = {
@@ -196,7 +205,48 @@ joli.apimodel.prototype = {
     Ti.App.fireEvent('joli.records.markedUpdated', {
       table: this.table
     });
-  }
+  },
+
+  newRecord: function(values, remote) {
+    var record = this.parent.newRecord(values);
+
+    // override the extended model class in the record references
+    record._options.table = this;
+
+    if (remote) {
+      record._metadata.remote = remote;
+    }
+
+    return record;
+  },
+
+  save: function(data) {
+    if (data.data.length === 0) {
+      return;
+    }
+
+    if (data.metadata.remote) {
+      // push the data remotely, it will be saved locally when the service
+      // aknowlodges the write
+      if (data.originalData) {
+        // existing record
+        this._api.put(JSON.stringify(data.data));
+      } else {
+        // new record
+        delete data.data.id;
+        this._api.post(JSON.stringify(data.data));
+      }
+
+      // result is null in that case, as xhr calls are asynchronous
+      // it is up to the developer to hook on joli.records.saved to get the
+      // object back
+      var result = null;
+    } else {
+      var result = this.parent.save(data);
+    }
+
+    return result;
+  },
 };
 
 joli.apimodel.api = function(options) {
@@ -205,16 +255,24 @@ joli.apimodel.api = function(options) {
 };
 
 joli.apimodel.api.prototype = {
-  call: function(method, params) {
+  call: function(method, params, contentBody) {
     try {
       this.xhrCallCompleted = false;
       this.xhr = Titanium.Network.createHTTPClient();
       this.xhr.apimodel = this.model.table;
+      this.xhr.httpmethod = method;
       var url = this.getUrl(params);
-      Titanium.API.log('info', 'loading url ' + url);
+      Titanium.API.log('info', method + ' request to url ' + url);
 
       this.xhr.onload = function() {
-        joli.saveRecord(this.apimodel, this.responseText);
+        Titanium.API.log('info', this.responseText);
+
+        if ('GET' == this.httpmethod) {
+          joli.saveRecord(this.apimodel, this.responseText);
+        } else if ('POST' == this.httpmethod) {
+          joli.saveRecord(this.apimodel, '[' + this.responseText + ']');
+        }
+
         return true;
       };
 
@@ -225,7 +283,12 @@ joli.apimodel.api.prototype = {
       }
 
       this.xhr.setTimeout(60000);
-      this.xhr.send();
+
+      if (contentBody) {
+        this.xhr.send(contentBody);
+      } else {
+        this.xhr.send();
+      }
     } catch(err) {
       Titanium.UI.createAlertDialog({
         title: "Error",
@@ -258,6 +321,10 @@ joli.apimodel.api.prototype = {
     }
 
     return url;
+  },
+
+  post: function(content) {
+    this.call('POST', null, content);
   },
 
   setResponseValues: function(values) {
