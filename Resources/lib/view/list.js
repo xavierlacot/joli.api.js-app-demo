@@ -9,7 +9,7 @@
   Ti.include('/lib/model/models.js');
 
   // load the associated controller
-  Ti.include('/lib/controller/people.js');
+  Ti.include('/lib/controller/list.js');
 
   // create a table view
   var peoples = controller.buildRows();
@@ -117,7 +117,7 @@
 
   function beginReloading() {
   	// just mock out the reload
-  	setTimeout(endReloading,2000);
+  	setTimeout(endReloading, 3000);
   }
 
   function endReloading() {
@@ -151,15 +151,29 @@
 
   tableview.addEventListener('scrollEnd', function(e) {
   	if (pulling && !reloading && e.contentOffset.y <= -65.0) {
-  		reloading = true;
-  		pulling = false;
-  		arrow.hide();
-  		actInd.show();
-  		statusLabel.text = "Reloading...";
-  		tableview.setContentInsets({top:60},{animated:true});
-  		arrow.transform=Ti.UI.create2DMatrix();
-  		beginReloading();
-  	}
+      var dialog = Titanium.UI.createOptionDialog({
+        title: 'Do you want to keep the local items which might have been deleted on the server?',
+        options: ['Yes, keep them', 'No, completely sync my database'],
+        cancel: 0
+      });
+      dialog.show();
+
+      dialog.addEventListener('click', function(event) {
+        if (1 == event.index) {
+          // empty the table, full resync
+          models.people.truncate();
+        }
+
+    		reloading = true;
+    		pulling = false;
+    		arrow.hide();
+    		actInd.show();
+    		statusLabel.text = "Reloading...";
+    		tableview.setContentInsets({top:60},{animated:true});
+    		arrow.transform=Ti.UI.create2DMatrix();
+    		beginReloading();
+    	});
+    }
   });
 
 
@@ -168,14 +182,19 @@
   	systemButton:Titanium.UI.iPhone.SystemButton.ADD
   });
   addPeople.addEventListener('click', function() {
-    // send to add.js
+    var win = Titanium.UI.createWindow({
+      backgroundColor:'#fff',
+      url: '/lib/view/add.js'
+    });
+
+    Titanium.UI.currentTab.open(win, {animated:true});
   });
 
   if (Ti.Platform.name == 'iPhone OS') {
   	win.rightNavButton = addPeople;
   } else {
   	addPeople.top = 5;
-  	addPeople.title = "Refresh";
+  	addPeople.title = "Add";
   	addPeople.width = 200;
   	tableview.top = 60;
   	win.add(addPeople);
