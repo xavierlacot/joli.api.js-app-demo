@@ -7,9 +7,6 @@
   Ti.include('/lib/joli.api.js');
   Ti.include('/lib/model/models.js');
 
-  // load the associated controller
-  Ti.include('/lib/controller/people.js');
-
   var people = models.people.findOneById(win.people_id);
 
   if (people) {
@@ -42,9 +39,8 @@
     var nameLabel = Titanium.UI.createLabel({
       font: { fontSize:16, fontWeight: 'bold' },
       height:42,
-      left:90,
-      right:10,
-      text: people.getFullName(),
+      left:105,
+      text: people.getFullName() + '(' + people.get('id') + ')',
       textAlign:'left',
       top:10,
       width:'auto'
@@ -55,8 +51,7 @@
       var companyLabel = Titanium.UI.createLabel({
         font: { fontSize:16 },
         height:42,
-        left:90,
-        right:10,
+        left:105,
         text: people.get('company_name'),
         textAlign:'left',
         top:26,
@@ -64,6 +59,8 @@
       });
       row.add(companyLabel);
     }
+
+    // @TODO : add the other informations
 
     // display the view
     tableview.setData([row]);
